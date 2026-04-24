@@ -1,4 +1,4 @@
-#!usr/bin/env python3
+#!/usr/bin/env python3
 
 from datetime import date
 
@@ -6,7 +6,7 @@ from app import app
 from models import db, Exercise, Workout, WorkoutExercise
 
 with app.app_context():
-    print("Clearing databse...")
+    print("Clearing database...")
 
     WorkoutExercise.query.delete()
     Exercise.query.delete()

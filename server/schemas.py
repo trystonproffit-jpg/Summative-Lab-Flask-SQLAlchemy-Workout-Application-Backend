@@ -1,24 +1,6 @@
 from marshmallow import Schema, fields, validates, validates_schema, ValidationError
 
 
-class ExerciseSchema(Schema):
-    id = fields.Int(dump_only=True)
-    name = fields.Str(required=True)
-    category = fields.Str(required=True)
-    equipment_needed = fields.Bool(missing=False)
-
-    @validates("name")
-    def validate_name(self, value):
-        if len(value.strip()) < 2:
-            raise ValidationError("Exercise name must be at least 2 characters.")
-
-    @validates("category")
-    def validate_category(self, value):
-        allowed = ["Strength", "Cardio", "Flexibility", "Balance"]
-        if value not in allowed:
-            raise ValidationError(f"Category must be one of: {', '.join(allowed)}.")
-
-
 class WorkoutExerciseSchema(Schema):
     id = fields.Int(dump_only=True)
     workout_id = fields.Int(required=True)
@@ -51,11 +33,31 @@ class WorkoutExerciseSchema(Schema):
             raise ValidationError("Provide either reps and sets, or duration_seconds.")
 
 
+class ExerciseSchema(Schema):
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True)
+    category = fields.Str(required=True)
+    equipment_needed = fields.Bool(missing=False)
+    workout_exercises = fields.Nested(WorkoutExerciseSchema, many=True, dump_only=True)
+
+    @validates("name")
+    def validate_name(self, value):
+        if len(value.strip()) < 2:
+            raise ValidationError("Exercise name must be at least 2 characters.")
+
+    @validates("category")
+    def validate_category(self, value):
+        allowed = ["Strength", "Cardio", "Flexibility", "Balance"]
+        if value not in allowed:
+            raise ValidationError(f"Category must be one of: {', '.join(allowed)}.")
+
+
 class WorkoutSchema(Schema):
     id = fields.Int(dump_only=True)
     date = fields.Date(required=True)
     duration_minutes = fields.Int(required=True)
     notes = fields.Str(allow_none=True)
+    workout_exercises = fields.Nested(WorkoutExerciseSchema, many=True, dump_only=True)
 
     @validates("duration_minutes")
     def validate_duration_minutes(self, value):

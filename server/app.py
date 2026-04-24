@@ -1,8 +1,8 @@
 from flask import Flask, request
 from flask_migrate import Migrate
-from datetime import datetime
 
 from models import db, Workout, Exercise, WorkoutExercise
+from schemas import WorkoutSchema, ExerciseSchema, WorkoutExerciseSchema
 
 app = Flask(__name__)
 
@@ -11,6 +11,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 migrate = Migrate(app, db)
 db.init_app(app)
+
+workout_schema = WorkoutSchema()
+workouts_schema = WorkoutSchema(many=True)
+
+exercise_schema = ExerciseSchema()
+exercises_schema = ExerciseSchema(many=True)
+
+workout_exercise_schema = WorkoutExerciseSchema()
 
 
 @app.route("/")
@@ -21,13 +29,7 @@ def index():
 @app.route("/workouts", methods=["GET"])
 def get_workouts():
     workouts = Workout.query.all()
-
-    return [{
-        "id": workout.id,
-        "date": workout.date.isoformat(),
-        "duration_minutes": workout.duration_minutes,
-        "notes": workout.notes
-    } for workout in workouts], 200
+    return workouts_schema.dump(workouts), 200
 
 
 @app.route("/workouts/<int:id>", methods=["GET"])
@@ -37,21 +39,7 @@ def get_workout_by_id(id):
     if not workout:
         return {"error": "Workout not found"}, 404
 
-    return {
-        "id": workout.id,
-        "date": workout.date.isoformat(),
-        "duration_minutes": workout.duration_minutes,
-        "notes": workout.notes,
-        "exercises": [{
-            "id": workout_exercise.exercise.id,
-            "name": workout_exercise.exercise.name,
-            "category": workout_exercise.exercise.category,
-            "equipment_needed": workout_exercise.exercise.equipment_needed,
-            "sets": workout_exercise.sets,
-            "reps": workout_exercise.reps,
-            "duration_seconds": workout_exercise.duration_seconds
-        } for workout_exercise in workout.workout_exercises]
-    }, 200
+    return workout_schema.dump(workout), 200
 
 
 @app.route("/workouts", methods=["POST"])
@@ -59,21 +47,14 @@ def create_workout():
     data = request.get_json()
 
     try:
-        new_workout = Workout(
-            date=datetime.strptime(data["date"], "%Y-%m-%d").date(),
-            duration_minutes=data["duration_minutes"],
-            notes=data.get("notes")
-        )
+        validated_data = workout_schema.load(data)
+
+        new_workout = Workout(**validated_data)
 
         db.session.add(new_workout)
         db.session.commit()
 
-        return {
-            "id": new_workout.id,
-            "date": new_workout.date.isoformat(),
-            "duration_minutes": new_workout.duration_minutes,
-            "notes": new_workout.notes
-        }, 201
+        return workout_schema.dump(new_workout), 201
 
     except Exception as e:
         return {"error": str(e)}, 400
@@ -95,13 +76,7 @@ def delete_workout(id):
 @app.route("/exercises", methods=["GET"])
 def get_exercises():
     exercises = Exercise.query.all()
-
-    return [{
-        "id": exercise.id,
-        "name": exercise.name,
-        "category": exercise.category,
-        "equipment_needed": exercise.equipment_needed
-    } for exercise in exercises], 200
+    return exercises_schema.dump(exercises), 200
 
 
 @app.route("/exercises/<int:id>", methods=["GET"])
@@ -111,21 +86,7 @@ def get_exercise_by_id(id):
     if not exercise:
         return {"error": "Exercise not found"}, 404
 
-    return {
-        "id": exercise.id,
-        "name": exercise.name,
-        "category": exercise.category,
-        "equipment_needed": exercise.equipment_needed,
-        "workouts": [{
-            "id": workout_exercise.workout.id,
-            "date": workout_exercise.workout.date.isoformat(),
-            "duration_minutes": workout_exercise.workout.duration_minutes,
-            "notes": workout_exercise.workout.notes,
-            "sets": workout_exercise.sets,
-            "reps": workout_exercise.reps,
-            "duration_seconds": workout_exercise.duration_seconds
-        } for workout_exercise in exercise.workout_exercises]
-    }, 200
+    return exercise_schema.dump(exercise), 200
 
 
 @app.route("/exercises", methods=["POST"])
@@ -133,21 +94,14 @@ def create_exercise():
     data = request.get_json()
 
     try:
-        new_exercise = Exercise(
-            name=data["name"],
-            category=data["category"],
-            equipment_needed=data.get("equipment_needed", False)
-        )
+        validated_data = exercise_schema.load(data)
+
+        new_exercise = Exercise(**validated_data)
 
         db.session.add(new_exercise)
         db.session.commit()
 
-        return {
-            "id": new_exercise.id,
-            "name": new_exercise.name,
-            "category": new_exercise.category,
-            "equipment_needed": new_exercise.equipment_needed
-        }, 201
+        return exercise_schema.dump(new_exercise), 201
 
     except Exception as e:
         return {"error": str(e)}, 400
@@ -180,25 +134,18 @@ def add_exercise_to_workout(workout_id, exercise_id):
     data = request.get_json()
 
     try:
-        workout_exercise = WorkoutExercise(
-            workout_id=workout_id,
-            exercise_id=exercise_id,
-            reps=data.get("reps"),
-            sets=data.get("sets"),
-            duration_seconds=data.get("duration_seconds")
-        )
+        validated_data = workout_exercise_schema.load({
+            **data,
+            "workout_id": workout_id,
+            "exercise_id": exercise_id
+        })
+
+        workout_exercise = WorkoutExercise(**validated_data)
 
         db.session.add(workout_exercise)
         db.session.commit()
 
-        return {
-            "id": workout_exercise.id,
-            "workout_id": workout_exercise.workout_id,
-            "exercise_id": workout_exercise.exercise_id,
-            "reps": workout_exercise.reps,
-            "sets": workout_exercise.sets,
-            "duration_seconds": workout_exercise.duration_seconds
-        }, 201
+        return workout_exercise_schema.dump(workout_exercise), 201
 
     except Exception as e:
         return {"error": str(e)}, 400
